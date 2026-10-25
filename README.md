@@ -1,1 +1,0 @@
-# STAT679-lottery-ticket-hypothesis
