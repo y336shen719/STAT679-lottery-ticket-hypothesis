@@ -1,5 +1,12 @@
 # CS679 Lottery Ticket Hypothesis — PyTorch starter
 
+## Introduction
+
+This project reproduces the Lottery Ticket Hypothesis
+using PyTorch.
+
+## Overview
+
 Research starter based on the algorithm in Frankle & Carbin (2019) and the
 Google Research TensorFlow 1.x *reimplementation*:
 https://github.com/google-research/lottery-ticket-hypothesis
