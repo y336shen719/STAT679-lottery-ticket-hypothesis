@@ -1,0 +1,5 @@
+numpy>=1.26
+# Install compatible torch and torchvision builds for your CPU/CUDA environment.
+torch>=2.2
+torchvision>=0.17
+pytest>=8
