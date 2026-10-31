@@ -16,7 +16,13 @@ def evaluate(model, loader, device):
     return {'loss': loss_sum / total, 'accuracy': correct / total}
 
 
-def train_fixed_steps(model, train_loader, val_loader, test_loader, masks, *, steps, lr, optimizer_name, eval_every, device):
+def train_fixed_steps(model, train_loader, val_loader, test_loader, masks, *, steps, lr, optimizer_name, eval_every, device,
+                      progress=False, desc='train'):
+    """`progress=True` shows a step-level tqdm bar with the latest validation metrics."""
+    bar = None
+    if progress:
+        from tqdm import tqdm
+        bar = tqdm(total=steps, desc=desc, leave=False, dynamic_ncols=True, position=1, mininterval=0.5)
     model.to(device)
     apply_masks(model, masks)
     if optimizer_name == 'sgd':
@@ -41,12 +47,18 @@ def train_fixed_steps(model, train_loader, val_loader, test_loader, masks, *, st
         mask_gradients(model, masks)
         optimizer.step()
         apply_masks(model, masks)
+        if bar is not None:
+            bar.update(1)
         if step % eval_every == 0 or step == steps:
             val = evaluate(model, val_loader, device)
             history.append({'step': step, 'val_loss': val['loss'], 'val_accuracy': val['accuracy']})
             if val['loss'] < best_loss:
                 best_loss, best_step = val['loss'], step
                 best_state = copy.deepcopy({k: v.detach().cpu() for k, v in model.state_dict().items()})
+            if bar is not None:
+                bar.set_postfix(val_loss=f"{val['loss']:.4f}", val_acc=f"{val['accuracy']:.4f}", best_step=best_step, refresh=False)
+    if bar is not None:
+        bar.close()
     end_state = copy.deepcopy({k: v.detach().cpu() for k, v in model.state_dict().items()})
     end_test = evaluate(model, test_loader, device)
     model.load_state_dict(best_state)
