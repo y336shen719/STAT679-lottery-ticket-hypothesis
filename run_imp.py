@@ -121,7 +121,8 @@ def main():
             print(line, flush=True)
         log_file.write(line + '\n'); log_file.flush()
 
-    train_loader, val_loader, test_loader = loaders(args.dataset, args.batch_size, args.seed, split_seed=args.split_seed)
+    train_loader, val_loader, test_loader = loaders(args.dataset, args.batch_size, args.seed,
+                                                    split_seed=args.split_seed, device=device)
     model = make_model(args.model)
     rates = {'fc1.weight': 0.2, 'fc2.weight': 0.2, 'fc3.weight': 0.1} if args.pruning == 'layerwise' else {'global': args.global_rate}
 

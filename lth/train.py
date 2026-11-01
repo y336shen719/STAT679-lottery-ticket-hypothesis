@@ -24,6 +24,7 @@ def train_fixed_steps(model, train_loader, val_loader, test_loader, masks, *, st
         from tqdm import tqdm
         bar = tqdm(total=steps, desc=desc, leave=False, dynamic_ncols=True, position=1, mininterval=0.5)
     model.to(device)
+    masks = {k: m.to(device) for k, m in masks.items()}  # copy once, not on every step
     apply_masks(model, masks)
     if optimizer_name == 'sgd':
         optimizer = torch.optim.SGD(model.parameters(), lr=lr)
