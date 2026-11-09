@@ -1336,3 +1336,28 @@ def run_extension3_pipeline(
         json.dump(metadata, f, indent=2)
 
     return out_dir
+
+
+def compute_conditional_error_agreement(df_pairs: pd.DataFrame) -> pd.DataFrame:
+    """Derive per-pair CEA from recorded fractions; undefined for zero errors.
+
+    No ratio of aggregated means is used. Original input columns are preserved.
+    """
+    out = df_pairs.copy()
+    correct = out["shared_correct"].to_numpy(dtype=float)
+    wrong = out["shared_wrong"].to_numpy(dtype=float)
+    n = out["n_samples"].to_numpy(dtype=float)
+    if not (np.isfinite(correct).all() and np.isfinite(wrong).all() and np.isfinite(n).all()):
+        raise ValueError("CEA requires finite fractions and sample counts")
+    if ((correct < 0) | (wrong < 0) | (correct + wrong > 1 + 1e-12) | (n <= 0) | (n != np.rint(n))).any():
+        raise ValueError("Invalid pair fractions or sample counts")
+    counts_correct = np.rint(correct * n)
+    counts_wrong = np.rint(wrong * n)
+    if not (np.allclose(correct * n, counts_correct, rtol=0, atol=1e-6)
+            and np.allclose(wrong * n, counts_wrong, rtol=0, atol=1e-6)):
+        raise ValueError("Recorded fractions do not correspond to integer sample counts")
+    denominator = n - counts_correct
+    out["at_least_one_wrong_count"] = denominator.astype(np.int64)
+    out["shared_wrong_count"] = counts_wrong.astype(np.int64)
+    out["cea"] = np.divide(counts_wrong, denominator, out=np.full(len(out), np.nan), where=denominator > 0)
+    return out

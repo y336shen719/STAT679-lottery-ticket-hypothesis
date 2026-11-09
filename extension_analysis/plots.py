@@ -95,28 +95,40 @@ def plot_mask_stability_grid(
             for col_idx, scp in enumerate(scopes):
                 ax = axes[row_idx, col_idx]
 
-                # 1. Plot individual pairs (pale curves)
+                # Distinct, staggered markers keep near-coincident pairs visible
+                # without shifting any observed coordinates.
                 pair_group = pairs_sub[
                     (pairs_sub["dataset"] == ds) & (pairs_sub["scope"] == scp)
                 ]
-                for (s_a, s_b), grp in pair_group.groupby(["seed_a", "seed_b"]):
+                for pair_idx, ((s_a, s_b), grp) in enumerate(
+                    pair_group.groupby(["seed_a", "seed_b"])
+                ):
                     grp_sorted = grp.sort_values(by="weights_remaining", ascending=False)
                     pair_key = (min(s_a, s_b), max(s_a, s_b))
-                    p_color = PAIR_COLORS.get(pair_key, "#a0a0a0")
+                    p_color = {
+                        (1, 2): "#648bd0",
+                        (1, 42): "#df9665",
+                        (2, 42): "#64aa94",
+                    }.get(pair_key, "#707070")
                     p_label = PAIR_LABELS.get(pair_key, f"Seeds {s_a} vs {s_b}")
                     ax.plot(
                         grp_sorted["weights_remaining"] * 100,
                         grp_sorted["jaccard"],
                         color=p_color,
-                        linewidth=1.2,
-                        alpha=0.7,
-                        linestyle="--",
-                        marker=".",
-                        markersize=3.5,
+                        linewidth=0.8,
+                        alpha=0.75,
+                        linestyle=["-", "--", ":"][pair_idx % 3],
+                        marker=["o", "s", "^"][pair_idx % 3],
+                        markevery=(pair_idx % 3, 3),
+                        markersize=4.0,
+                        markerfacecolor="white",
+                        markeredgewidth=0.8,
+                        zorder=3,
                         label=p_label if (row_idx == 0 and col_idx == 0) else None,
                     )
 
-                # 2. Plot mean curve (prominent solid line)
+                # Keep the mean behind the pair markers; hollow diamonds and
+                # a fine dashed line avoid masking the individual trajectories.
                 sum_group = summary_sub[
                     (summary_sub["dataset"] == ds) & (summary_sub["scope"] == scp)
                 ]
@@ -127,11 +139,16 @@ def plot_mask_stability_grid(
                     sum_sorted["weights_remaining"] * 100,
                     sum_sorted["mean"],
                     color=INK,
-                    linewidth=2.0,
-                    marker="o",
-                    markersize=4.0,
+                    linewidth=1.0,
+                    linestyle=(0, (5, 4)),
+                    alpha=0.45,
+                    marker="D",
+                    markevery=(1, 3),
+                    markersize=6.5,
+                    markerfacecolor="none",
+                    markeredgewidth=0.9,
                     label="Mean across pairs" if (row_idx == 0 and col_idx == 0) else None,
-                    zorder=4,
+                    zorder=2,
                 )
 
                 # Configure axes
@@ -242,7 +259,7 @@ def plot_random_reference_grid(
                     grp_sorted["reference_p025"],
                     grp_sorted["reference_p975"],
                     color=ACCENT_BLUE,
-                    alpha=0.25,
+                    alpha=0.15,
                     label="Random 95% reference interval" if (row_idx == 0 and col_idx == 0) else None,
                     linewidth=0,
                 )
@@ -251,9 +268,10 @@ def plot_random_reference_grid(
                 ax.plot(
                     x_vals,
                     grp_sorted["reference_mean"],
-                    color=ACCENT_BLUE,
+                    color="#648bd0",
                     linestyle="--",
-                    linewidth=1.8,
+                    linewidth=0.8,
+                    alpha=0.75,
                     label="Random reference mean" if (row_idx == 0 and col_idx == 0) else None,
                     zorder=3,
                 )
@@ -264,11 +282,14 @@ def plot_random_reference_grid(
                     grp_sorted["observed_mean"],
                     color=INK,
                     linestyle="-",
-                    linewidth=2.0,
+                    linewidth=1.0,
+                    alpha=0.45,
                     marker="o",
                     markersize=4.0,
+                    markerfacecolor="none",
+                    markeredgewidth=0.8,
                     label="Observed ticket mean" if (row_idx == 0 and col_idx == 0) else None,
-                    zorder=4,
+                    zorder=2,
                 )
 
                 # Axis configuration
@@ -350,15 +371,18 @@ def plot_random_reference_difference(
             diff_vals = grp["observed_minus_reference"]
 
             # Zero reference line
-            ax.axhline(0, color=MUTED, linestyle="--", linewidth=1.0, alpha=0.7)
+            ax.axhline(0, color=MUTED, linestyle="--", linewidth=0.8, alpha=0.45)
 
             ax.plot(
                 x_vals,
                 diff_vals,
-                color=INK if ds == "mnist" else ACCENT_ORANGE,
-                linewidth=2.0,
+                color=INK if ds == "mnist" else "#df9665",
+                linewidth=0.9,
+                alpha=0.6,
                 marker="o",
-                markersize=4.5,
+                markersize=4.0,
+                markerfacecolor="none",
+                markeredgewidth=0.8,
                 label=f"{ds_name} overall difference",
             )
 
@@ -396,136 +420,60 @@ def plot_prediction_agreement_curves(
     save_pdf: Optional[Path] = None,
     dpi: int = 200,
 ) -> plt.Figure:
-    """Plot cross-seed prediction agreement vs remaining weights.
-
-    Shows agreement decomposed into shared correct predictions and shared errors,
-    as well as individual seed pair trajectories.
-    """
-    rc_params = _get_base_rc_params()
-    datasets = ["mnist", "fashion_mnist"]
-
-    with plt.rc_context(rc_params):
-        fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=False)
-
-        for idx, ds in enumerate(datasets):
-            ax = axes[idx]
-            ds_name = DATASET_TITLES.get(ds, ds)
-            is_avail = dataset_status[ds]["available"] if dataset_status and ds in dataset_status else (not df_summary[df_summary["dataset"] == ds].empty)
-
-            if not is_avail:
-                ax.text(
-                    0.5,
-                    0.5,
-                    f"{ds_name} Blocked\n\nLocal test data not found\n(download=False enforced per experiment protocol)",
-                    ha="center",
-                    va="center",
-                    transform=ax.transAxes,
-                    fontsize=9.5,
-                    color=MUTED,
-                    bbox=dict(
-                        boxstyle="round,pad=0.6",
-                        facecolor="#fbfbf9",
-                        edgecolor=GRID,
-                        linewidth=1.0,
-                    ),
-                )
-                ax.set_title(f"{ds_name} — Blocked", pad=8, weight="bold")
-                ax.set_xticks([])
-                ax.set_yticks([])
+    """Focused accuracy/agreement panels and separate shared-error panels."""
+    with plt.rc_context(_get_base_rc_params()):
+        fig, axes = plt.subplots(3, 2, figsize=(12, 10))
+        for col, ds in enumerate(["mnist", "fashion_mnist"]):
+            top, accuracy_ax, bottom = axes[:, col]
+            summary = df_summary[df_summary["dataset"] == ds].sort_values("weights_remaining", ascending=False)
+            pairs = df_pairs[df_pairs["dataset"] == ds]
+            if summary.empty:
+                for ax in (top, accuracy_ax, bottom):
+                    ax.text(.5, .5, "Saved results unavailable", ha="center", transform=ax.transAxes)
                 continue
-
-            sub_sum = df_summary[df_summary["dataset"] == ds].sort_values(by="weights_remaining", ascending=False)
-            sub_pairs = df_pairs[df_pairs["dataset"] == ds]
-
-            x_vals = sub_sum["weights_remaining"] * 100
-
-            # 1. Plot individual seed pairs in light colors
-            for (s_a, s_b), color in PAIR_COLORS.items():
-                pair_data = sub_pairs[
-                    (sub_pairs["seed_a"] == s_a) & (sub_pairs["seed_b"] == s_b)
-                ].sort_values(by="weights_remaining", ascending=False)
-                if not pair_data.empty:
-                    ax.plot(
-                        pair_data["weights_remaining"] * 100,
-                        pair_data["agreement"] * 100,
-                        color=color,
-                        linestyle=":",
-                        linewidth=1.2,
-                        alpha=0.8,
-                        label=f"{PAIR_LABELS.get((s_a, s_b), f'{s_a} vs {s_b}')}",
-                    )
-
-            # 2. Plot Mean Agreement
-            ax.plot(
-                x_vals,
-                sub_sum["agreement_mean"] * 100,
-                color=INK,
-                linewidth=2.2,
-                marker="o",
-                markersize=4.5,
-                label="Mean Prediction Agreement",
-                zorder=4,
-            )
-
-            # 3. Plot Mean Test Accuracy
-            ax.plot(
-                x_vals,
-                sub_sum["accuracy_mean"] * 100,
-                color=ACCENT_BLUE,
-                linewidth=1.6,
-                linestyle="--",
-                marker="s",
-                markersize=3.5,
-                label="Mean Test Accuracy",
-                zorder=3,
-            )
-
-            # 4. Plot Shared Correct
-            ax.plot(
-                x_vals,
-                sub_sum["shared_correct_mean"] * 100,
-                color="#2e8b57",
-                linewidth=1.5,
-                linestyle="-.",
-                label="Shared Correct Predictions",
-                zorder=3,
-            )
-
-            # 5. Shared Errors on secondary axis or bottom note
-            ax.plot(
-                x_vals,
-                sub_sum["shared_wrong_mean"] * 100,
-                color=ACCENT_ORANGE,
-                linewidth=1.4,
-                linestyle="-.",
-                label="Shared Errors (Wrong)",
-                zorder=3,
-            )
-
-            ax.set_xscale("log")
-            ax.invert_xaxis()
-            ticks = [100, 50, 20, 10, 5]
-            ax.set_xticks(ticks)
-            ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
-            ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%g%%"))
-
-            ax.set_title(f"{ds_name} — Prediction Agreement & Accuracy", pad=8, weight="bold")
-            ax.set_xlabel("Weights remaining (log scale)")
-            ax.set_ylabel("Rate (%)")
-            ax.set_ylim(-1, 102)
-
-            ax.legend(loc="center left", bbox_to_anchor=(0.02, 0.45), fontsize=8.0, frameon=False)
-
-        plt.tight_layout()
-
-        if save_png:
-            Path(save_png).parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(save_png, dpi=dpi, bbox_inches="tight")
-        if save_pdf:
-            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
-            fig.savefig(save_pdf, bbox_inches="tight")
-
-    return fig
+            x = summary["weights_remaining"] * 100
+            for idx, (pair, color) in enumerate(PAIR_COLORS.items()):
+                d = pairs[(pairs.seed_a == pair[0]) & (pairs.seed_b == pair[1])].sort_values("weights_remaining", ascending=False)
+                top.plot(d.weights_remaining * 100, d.agreement * 100, color=color,
+                         linewidth=.8, alpha=.8, linestyle=["-", "--", ":"][idx], label=PAIR_LABELS[pair], zorder=3)
+            for key, label, color, style in [
+                ("agreement_mean", "Mean agreement", INK, "--"),
+                ("accuracy_mean", "Mean test accuracy", "#648bd0", "-."),
+                ("shared_correct_mean", "Shared correct", "#64aa94", ":"),
+            ]:
+                target_ax = top if key == "agreement_mean" else accuracy_ax
+                target_ax.plot(x, summary[key] * 100, color=color, linestyle=style,
+                         linewidth=1, alpha=.55, label=label, zorder=2)
+            values = pairs.agreement.to_numpy() * 100
+            padding = max(.25, np.ptp(values) * .12)
+            top.set_ylim(max(0, values.min() - padding), min(100, values.max() + padding))
+            top.set_title(f"{DATASET_TITLES[ds]} — Prediction Agreement", weight="bold")
+            top.set_ylabel("Rate (%) — truncated y-axis")
+            top.legend(fontsize=7.5, ncol=2, loc="lower center")
+            accuracy_values = summary[["accuracy_mean", "shared_correct_mean"]].to_numpy() * 100
+            accuracy_padding = max(.25, np.ptp(accuracy_values) * .12)
+            accuracy_ax.set_ylim(max(0, accuracy_values.min() - accuracy_padding), min(100, accuracy_values.max() + accuracy_padding))
+            accuracy_ax.set_title(f"{DATASET_TITLES[ds]} — Accuracy and Joint Correctness")
+            accuracy_ax.set_ylabel("Rate (%) — truncated y-axis")
+            accuracy_ax.legend(fontsize=8, loc="lower center")
+            bottom.plot(x, summary.shared_wrong_mean * 100, color="#df9665", marker="o",
+                        markerfacecolor="none", markersize=3.5, linewidth=.9, alpha=.8, label="Shared wrong (same class)")
+            bottom.set_ylim(0, max(1, summary.shared_wrong_mean.max() * 115))
+            bottom.set_title(f"{DATASET_TITLES[ds]} — Shared Incorrect Predictions")
+            bottom.set_ylabel("All test examples (%)")
+            bottom.legend(fontsize=8)
+            for ax in (top, accuracy_ax, bottom):
+                ax.set_xscale("log")
+                ax.invert_xaxis()
+                ax.set_xticks([100, 50, 20, 10, 5])
+                ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%g%%"))
+                ax.set_xlabel("Weights remaining (log scale)")
+        fig.tight_layout()
+        for path in (save_png, save_pdf):
+            if path:
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+                fig.savefig(path, dpi=dpi, bbox_inches="tight")
+        return fig
 
 
 def plot_structure_function_scatter(
@@ -594,8 +542,8 @@ def plot_structure_function_scatter(
                         cmap=cmap,
                         norm=norm,
                         marker=marker,
-                        s=40,
-                        alpha=0.85,
+                        s=28,
+                        alpha=0.65,
                         edgecolors="none",
                         label=f"{PAIR_LABELS.get((s_a, s_b), f'{s_a} vs {s_b}')}",
                     )
@@ -607,7 +555,8 @@ def plot_structure_function_scatter(
                     dense_df["agreement"] * 100,
                     color=INK,
                     marker="*",
-                    s=90,
+                    s=65,
+                    alpha=0.55,
                     zorder=5,
                     label="Level 0 (Dense Baseline)",
                 )
@@ -620,21 +569,27 @@ def plot_structure_function_scatter(
             ax.set_title(f"{ds_name} — Mask Overlap vs Prediction Agreement", pad=8, weight="bold")
             ax.set_xlabel("Overall Mask Jaccard (Structural Overlap)")
             ax.set_ylabel("Prediction Agreement (%) (Functional Overlap)")
-            ax.set_ylim(95.0, 100.2)
+            agreement_pct = sub_df["agreement"] * 100
+            ax.set_ylim(agreement_pct.min() - 0.8, agreement_pct.max() + 0.8)
             ax.set_xlim(-0.03, 1.05)
 
-            # Add illustrative annotation highlighting key finding
-            ax.annotate(
-                "Level 15 winning tickets:\nJaccard ~ 0.026, Agreement > 98%",
-                xy=(0.0256, 98.23),
-                xytext=(0.18, 96.2),
-                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.0),
-                fontsize=8.5,
-                color=INK,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#fbfbf9", edgecolor=GRID),
-            )
+            # Annotate each dataset using its saved Level 15 results.
+            last_level = sub_df[sub_df["level"] == 15]
+            if not last_level.empty:
+                mean_j = last_level["mask_jaccard"].mean()
+                mean_a = last_level["agreement"].mean() * 100
+                ax.annotate(
+                    f"Level 15 mean:\nJaccard = {mean_j:.4f}, Agreement = {mean_a:.2f}%",
+                    xy=(mean_j, mean_a),
+                    xytext=(0.05, 0.08),
+                    textcoords="axes fraction",
+                    arrowprops=dict(arrowstyle="->", color=MUTED, lw=0.8),
+                    fontsize=8.0,
+                    color=MUTED,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="#fbfbf9", edgecolor=GRID),
+                )
 
-            ax.legend(loc="lower right", fontsize=8.0, frameon=False)
+            ax.legend(loc="upper right", fontsize=8.0, frameon=False)
 
         plt.tight_layout()
 
@@ -649,10 +604,10 @@ def plot_structure_function_scatter(
 
 
 LAYER_COLORS = {
-    "fc1.weight": "#2a78d6",
-    "fc2.weight": "#eb6834",
-    "fc3.weight": "#2ba84a",
-    "overall": "#111111",
+    "fc1.weight": "#648bd0",
+    "fc2.weight": "#df9665",
+    "fc3.weight": "#64aa94",
+    "overall": "#666666",
 }
 
 LAYER_DISPLAY_NAMES = {
@@ -684,8 +639,9 @@ def plot_layer_sparsity_curves(
                 sub["level"],
                 sub["sparsity_mean"] * 100.0,
                 marker="o",
-                markersize=4.5,
-                linewidth=1.8,
+                markersize=3.5,
+                linewidth=0.9,
+                alpha=0.7,
                 label=LAYER_DISPLAY_NAMES[layer_name],
                 color=LAYER_COLORS[layer_name],
             )
@@ -705,8 +661,9 @@ def plot_layer_sparsity_curves(
                 sub["level"],
                 sub["surviving_mean"],
                 marker="s",
-                markersize=4.5,
-                linewidth=1.8,
+                markersize=3.5,
+                linewidth=0.9,
+                alpha=0.7,
                 label=LAYER_DISPLAY_NAMES[layer_name],
                 color=LAYER_COLORS[layer_name],
             )
@@ -752,8 +709,9 @@ def plot_layer_share_evolution(
                 sub["level"],
                 sub["surviving_share_mean"] * 100.0,
                 marker="o",
-                markersize=4.5,
-                linewidth=1.8,
+                markersize=3.5,
+                linewidth=0.9,
+                alpha=0.7,
                 label=LAYER_DISPLAY_NAMES[layer_name],
                 color=LAYER_COLORS[layer_name],
             )
@@ -771,8 +729,9 @@ def plot_layer_share_evolution(
             sub_fc3["level"],
             sub_fc3["surviving_share_mean"] * 100.0,
             marker="^",
-            markersize=5.0,
-            linewidth=2.0,
+            markersize=4.0,
+            linewidth=0.9,
+            alpha=0.7,
             label="FC3 (10%/lvl rate vs 20%/lvl for FC1/FC2)",
             color=LAYER_COLORS["fc3.weight"],
         )
@@ -830,7 +789,8 @@ def plot_pruning_schedule_adherence(
                 sub["actual_prune_rate_mean"] * 100.0,
                 marker="o",
                 markersize=4.0,
-                linewidth=1.5,
+                linewidth=0.9,
+                alpha=0.7,
                 label=LAYER_DISPLAY_NAMES[layer_name],
                 color=LAYER_COLORS[layer_name],
             )
@@ -849,7 +809,8 @@ def plot_pruning_schedule_adherence(
                 sub["prune_rate_diff_mean"] * 100.0,
                 marker="s",
                 markersize=4.0,
-                linewidth=1.2,
+                linewidth=0.9,
+                alpha=0.7,
                 label=LAYER_DISPLAY_NAMES[layer_name],
                 color=LAYER_COLORS[layer_name],
             )
@@ -872,3 +833,74 @@ def plot_pruning_schedule_adherence(
             fig.savefig(save_pdf, bbox_inches="tight")
 
     return fig
+
+
+def plot_excess_jaccard_bars(df_summary: pd.DataFrame) -> plt.Figure:
+    """Compare observed-minus-reference overall Jaccard at selected levels."""
+    levels = [1, 2, 3, 5, 8, 11, 15]
+    selected = df_summary[(df_summary["scope"] == "overall") & df_summary["level"].isin(levels)].copy()
+    if selected.duplicated(["dataset", "level"]).any():
+        raise ValueError("Expected one overall summary per dataset and level")
+    selected["excess"] = selected["observed_mean"] - selected["reference_mean"]
+    table = selected.pivot(index="level", columns="dataset", values="excess").reindex(levels)
+    if table.reindex(columns=["mnist", "fashion_mnist"]).isna().any().any():
+        raise ValueError("Missing selected dataset/level results")
+    with plt.rc_context(_get_base_rc_params()):
+        fig, ax = plt.subplots(figsize=(10, 4.8))
+        x = np.arange(len(levels))
+        for offset, ds, color in [(-.19, "mnist", "#648bd0"), (.19, "fashion_mnist", "#df9665")]:
+            bars = ax.bar(x + offset, table[ds], width=.36, color=color, alpha=.85,
+                          label=DATASET_TITLES[ds], zorder=3)
+            ax.bar_label(bars, fmt="%.4f", padding=3, fontsize=8)
+        ax.axhline(0, color=MUTED, linewidth=.8)
+        ax.set_ylim(min(0, table.min().min() * 1.2), max(.001, table.max().max() * 1.22))
+        ax.set_xticks(x, [f"L{level}" for level in levels])
+        ax.set_xlabel("Pruning Level")
+        ax.set_ylabel("Excess Jaccard (observed − random reference)")
+        ax.set_title("MNIST vs Fashion-MNIST, selected pruning levels", fontsize=10, pad=10)
+        fig.suptitle("Extension 2 — Observed Excess Jaccard", fontsize=13, weight="bold")
+        ax.xaxis.grid(False)
+        ax.legend()
+        fig.tight_layout()
+        return fig
+
+
+def plot_conditional_error_agreement(cea_summary: pd.DataFrame) -> plt.Figure:
+    """Mean per-pair CEA with descriptive ±1 sample SD (not a CI)."""
+    with plt.rc_context(_get_base_rc_params()):
+        fig, ax = plt.subplots(figsize=(10, 5))
+        lower_bounds, upper_bounds = [], []
+        for ds, color, marker in [
+            ("mnist", "#648bd0", "o"),
+            ("fashion_mnist", "#df9665", "s"),
+        ]:
+            group = cea_summary[cea_summary["dataset"] == ds].sort_values("level")
+            if group["level"].duplicated().any():
+                raise ValueError("CEA chart expects one model per dataset and level")
+            x = group["level"].to_numpy()
+            mean = group["cea_mean"].to_numpy(dtype=float) * 100
+            sd = group["cea_sd"].to_numpy(dtype=float) * 100
+            ax.plot(x, mean, color=color, marker=marker, markersize=4,
+                    markerfacecolor="white", markeredgewidth=.8,
+                    linewidth=1.1, label=DATASET_TITLES[ds])
+            ax.fill_between(x, mean - sd, mean + sd, color=color, alpha=.14,
+                            linewidth=0)
+            lower_bounds.extend((mean - sd)[np.isfinite(mean - sd)])
+            upper_bounds.extend((mean + sd)[np.isfinite(mean + sd)])
+        if lower_bounds:
+            span = max(1, max(upper_bounds) - min(lower_bounds))
+            low = max(0, min(lower_bounds) - .1 * span)
+            high = min(100, max(upper_bounds) + .1 * span)
+            ax.set_ylim(low, high)
+            ax.set_ylabel("Conditional Error Agreement (%)" +
+                          (" — truncated y-axis" if low > 0 or high < 100 else ""))
+        else:
+            ax.set_ylabel("Conditional Error Agreement (%)")
+        ax.set_xticks(range(16))
+        ax.set_xlabel("Pruning Level")
+        ax.set_title("Conditional Error Agreement Across Pruning Levels", weight="bold", pad=12)
+        ax.legend(title="Mean across seed pairs")
+        fig.text(.5, .02, "Shading: ±1 sample SD across shared-seed pairs (descriptive variation, not a confidence interval).",
+                 ha="center", fontsize=8, color=MUTED)
+        fig.tight_layout(rect=[0, .05, 1, 1])
+        return fig
