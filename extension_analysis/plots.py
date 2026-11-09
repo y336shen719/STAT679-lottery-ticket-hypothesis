@@ -386,3 +386,263 @@ def plot_random_reference_difference(
             fig.savefig(save_pdf, bbox_inches="tight")
 
     return fig
+
+
+def plot_prediction_agreement_curves(
+    df_summary: pd.DataFrame,
+    df_pairs: pd.DataFrame,
+    dataset_status: Optional[dict] = None,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 200,
+) -> plt.Figure:
+    """Plot cross-seed prediction agreement vs remaining weights.
+
+    Shows agreement decomposed into shared correct predictions and shared errors,
+    as well as individual seed pair trajectories.
+    """
+    rc_params = _get_base_rc_params()
+    datasets = ["mnist", "fashion_mnist"]
+
+    with plt.rc_context(rc_params):
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=False)
+
+        for idx, ds in enumerate(datasets):
+            ax = axes[idx]
+            ds_name = DATASET_TITLES.get(ds, ds)
+            is_avail = dataset_status[ds]["available"] if dataset_status and ds in dataset_status else (not df_summary[df_summary["dataset"] == ds].empty)
+
+            if not is_avail:
+                ax.text(
+                    0.5,
+                    0.5,
+                    f"{ds_name} Blocked\n\nLocal test data not found\n(download=False enforced per experiment protocol)",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                    fontsize=9.5,
+                    color=MUTED,
+                    bbox=dict(
+                        boxstyle="round,pad=0.6",
+                        facecolor="#fbfbf9",
+                        edgecolor=GRID,
+                        linewidth=1.0,
+                    ),
+                )
+                ax.set_title(f"{ds_name} — Blocked", pad=8, weight="bold")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                continue
+
+            sub_sum = df_summary[df_summary["dataset"] == ds].sort_values(by="weights_remaining", ascending=False)
+            sub_pairs = df_pairs[df_pairs["dataset"] == ds]
+
+            x_vals = sub_sum["weights_remaining"] * 100
+
+            # 1. Plot individual seed pairs in light colors
+            for (s_a, s_b), color in PAIR_COLORS.items():
+                pair_data = sub_pairs[
+                    (sub_pairs["seed_a"] == s_a) & (sub_pairs["seed_b"] == s_b)
+                ].sort_values(by="weights_remaining", ascending=False)
+                if not pair_data.empty:
+                    ax.plot(
+                        pair_data["weights_remaining"] * 100,
+                        pair_data["agreement"] * 100,
+                        color=color,
+                        linestyle=":",
+                        linewidth=1.2,
+                        alpha=0.8,
+                        label=f"{PAIR_LABELS.get((s_a, s_b), f'{s_a} vs {s_b}')}",
+                    )
+
+            # 2. Plot Mean Agreement
+            ax.plot(
+                x_vals,
+                sub_sum["agreement_mean"] * 100,
+                color=INK,
+                linewidth=2.2,
+                marker="o",
+                markersize=4.5,
+                label="Mean Prediction Agreement",
+                zorder=4,
+            )
+
+            # 3. Plot Mean Test Accuracy
+            ax.plot(
+                x_vals,
+                sub_sum["accuracy_mean"] * 100,
+                color=ACCENT_BLUE,
+                linewidth=1.6,
+                linestyle="--",
+                marker="s",
+                markersize=3.5,
+                label="Mean Test Accuracy",
+                zorder=3,
+            )
+
+            # 4. Plot Shared Correct
+            ax.plot(
+                x_vals,
+                sub_sum["shared_correct_mean"] * 100,
+                color="#2e8b57",
+                linewidth=1.5,
+                linestyle="-.",
+                label="Shared Correct Predictions",
+                zorder=3,
+            )
+
+            # 5. Shared Errors on secondary axis or bottom note
+            ax.plot(
+                x_vals,
+                sub_sum["shared_wrong_mean"] * 100,
+                color=ACCENT_ORANGE,
+                linewidth=1.4,
+                linestyle="-.",
+                label="Shared Errors (Wrong)",
+                zorder=3,
+            )
+
+            ax.set_xscale("log")
+            ax.invert_xaxis()
+            ticks = [100, 50, 20, 10, 5]
+            ax.set_xticks(ticks)
+            ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
+            ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%g%%"))
+
+            ax.set_title(f"{ds_name} — Prediction Agreement & Accuracy", pad=8, weight="bold")
+            ax.set_xlabel("Weights remaining (log scale)")
+            ax.set_ylabel("Rate (%)")
+            ax.set_ylim(-1, 102)
+
+            ax.legend(loc="center left", bbox_to_anchor=(0.02, 0.45), fontsize=8.0, frameon=False)
+
+        plt.tight_layout()
+
+        if save_png:
+            Path(save_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
+
+
+def plot_structure_function_scatter(
+    df_sf_pairs: pd.DataFrame,
+    dataset_status: Optional[dict] = None,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 200,
+) -> plt.Figure:
+    """Plot Structure vs Function: Mask Jaccard vs Prediction Agreement.
+
+    Reveals that winning tickets with very low coordinate overlap (low Jaccard)
+    still exhibit very high functional agreement on test predictions.
+    """
+    rc_params = _get_base_rc_params()
+    datasets = ["mnist", "fashion_mnist"]
+    pair_markers = {(1, 2): "o", (1, 42): "^", (2, 42): "s"}
+
+    with plt.rc_context(rc_params):
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=False)
+
+        for idx, ds in enumerate(datasets):
+            ax = axes[idx]
+            ds_name = DATASET_TITLES.get(ds, ds)
+            is_avail = dataset_status[ds]["available"] if dataset_status and ds in dataset_status else (not df_sf_pairs[df_sf_pairs["dataset"] == ds].empty)
+
+            if not is_avail:
+                ax.text(
+                    0.5,
+                    0.5,
+                    f"{ds_name} Blocked\n\nLocal test data not found\n(download=False enforced)",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                    fontsize=9.5,
+                    color=MUTED,
+                    bbox=dict(
+                        boxstyle="round,pad=0.6",
+                        facecolor="#fbfbf9",
+                        edgecolor=GRID,
+                        linewidth=1.0,
+                    ),
+                )
+                ax.set_title(f"{ds_name} — Blocked", pad=8, weight="bold")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                continue
+
+            sub_df = df_sf_pairs[df_sf_pairs["dataset"] == ds].copy()
+
+            # Separate dense (Level 0) and sparse (Levels 1-15)
+            sparse_df = sub_df[sub_df["level"] > 0]
+            dense_df = sub_df[sub_df["level"] == 0]
+
+            cmap = plt.cm.viridis
+            norm = plt.Normalize(vmin=1, vmax=15)
+
+            sc = None
+            for (s_a, s_b), marker in pair_markers.items():
+                p_data = sparse_df[(sparse_df["seed_a"] == s_a) & (sparse_df["seed_b"] == s_b)]
+                if not p_data.empty:
+                    sc = ax.scatter(
+                        p_data["mask_jaccard"],
+                        p_data["agreement"] * 100,
+                        c=p_data["level"],
+                        cmap=cmap,
+                        norm=norm,
+                        marker=marker,
+                        s=40,
+                        alpha=0.85,
+                        edgecolors="none",
+                        label=f"{PAIR_LABELS.get((s_a, s_b), f'{s_a} vs {s_b}')}",
+                    )
+
+            # Plot dense baseline (Level 0)
+            if not dense_df.empty:
+                ax.scatter(
+                    dense_df["mask_jaccard"],
+                    dense_df["agreement"] * 100,
+                    color=INK,
+                    marker="*",
+                    s=90,
+                    zorder=5,
+                    label="Level 0 (Dense Baseline)",
+                )
+
+            if sc is not None:
+                cbar = plt.colorbar(sc, ax=ax, pad=0.03, aspect=25)
+                cbar.set_label("Pruning Level (1 = least sparse, 15 = most sparse)", fontsize=8.5)
+                cbar.ax.tick_params(labelsize=8)
+
+            ax.set_title(f"{ds_name} — Mask Overlap vs Prediction Agreement", pad=8, weight="bold")
+            ax.set_xlabel("Overall Mask Jaccard (Structural Overlap)")
+            ax.set_ylabel("Prediction Agreement (%) (Functional Overlap)")
+            ax.set_ylim(95.0, 100.2)
+            ax.set_xlim(-0.03, 1.05)
+
+            # Add illustrative annotation highlighting key finding
+            ax.annotate(
+                "Level 15 winning tickets:\nJaccard ~ 0.026, Agreement > 98%",
+                xy=(0.0256, 98.23),
+                xytext=(0.18, 96.2),
+                arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.0),
+                fontsize=8.5,
+                color=INK,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#fbfbf9", edgecolor=GRID),
+            )
+
+            ax.legend(loc="lower right", fontsize=8.0, frameon=False)
+
+        plt.tight_layout()
+
+        if save_png:
+            Path(save_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
