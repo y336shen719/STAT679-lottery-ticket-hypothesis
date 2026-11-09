@@ -1,0 +1,50 @@
+[2026-10-31 16:42:03] Controls for runs\mnist_adam_seed42 on cuda: conditions=['ticket'], levels=[1]
+[2026-10-31 16:45:07] ticket level 01 done: level=1, weights_remaining=0.8004, best_step=4400, best_val_loss=0.0728, best_test_accuracy=0.9792, end_test_accuracy=0.9827 | matches IMP run: YES
+[2026-10-31 16:45:07] All requested controls complete.
+[2026-10-31 16:46:44] Controls for runs\mnist_adam_seed42 on cuda: conditions=['reinit', 'random_mask', 'random_both'], levels=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+[2026-10-31 16:49:48] reinit level 01 done: level=1, weights_remaining=0.8004, best_step=2500, best_val_loss=0.0698, best_test_accuracy=0.9790, end_test_accuracy=0.9816
+[2026-10-31 16:52:50] reinit level 02 done: level=2, weights_remaining=0.6406, best_step=4400, best_val_loss=0.0742, best_test_accuracy=0.9781, end_test_accuracy=0.9828
+[2026-10-31 16:55:51] reinit level 03 done: level=3, weights_remaining=0.5128, best_step=4000, best_val_loss=0.0734, best_test_accuracy=0.9801, end_test_accuracy=0.9797
+[2026-10-31 16:58:53] reinit level 04 done: level=4, weights_remaining=0.4105, best_step=4700, best_val_loss=0.0759, best_test_accuracy=0.9811, end_test_accuracy=0.9805
+[2026-10-31 17:01:54] reinit level 05 done: level=5, weights_remaining=0.3287, best_step=5600, best_val_loss=0.0801, best_test_accuracy=0.9785, end_test_accuracy=0.9812
+[2026-10-31 17:04:54] reinit level 06 done: level=6, weights_remaining=0.2632, best_step=7100, best_val_loss=0.0819, best_test_accuracy=0.9786, end_test_accuracy=0.9804
+[2026-10-31 17:07:55] reinit level 07 done: level=7, weights_remaining=0.2107, best_step=6500, best_val_loss=0.0759, best_test_accuracy=0.9797, end_test_accuracy=0.9787
+[2026-10-31 17:10:56] reinit level 08 done: level=8, weights_remaining=0.1688, best_step=6900, best_val_loss=0.0766, best_test_accuracy=0.9804, end_test_accuracy=0.9820
+[2026-10-31 17:13:56] reinit level 09 done: level=9, weights_remaining=0.1352, best_step=8500, best_val_loss=0.0830, best_test_accuracy=0.9791, end_test_accuracy=0.9773
+[2026-10-31 17:16:55] reinit level 10 done: level=10, weights_remaining=0.1083, best_step=9500, best_val_loss=0.0873, best_test_accuracy=0.9770, end_test_accuracy=0.9794
+[2026-10-31 17:19:56] reinit level 11 done: level=11, weights_remaining=0.0868, best_step=9400, best_val_loss=0.0890, best_test_accuracy=0.9752, end_test_accuracy=0.9754
+[2026-10-31 17:22:57] reinit level 12 done: level=12, weights_remaining=0.0695, best_step=9700, best_val_loss=0.0922, best_test_accuracy=0.9744, end_test_accuracy=0.9760
+[2026-10-31 17:25:55] reinit level 13 done: level=13, weights_remaining=0.0557, best_step=12000, best_val_loss=0.0978, best_test_accuracy=0.9740, end_test_accuracy=0.9737
+[2026-10-31 17:28:56] reinit level 14 done: level=14, weights_remaining=0.0447, best_step=16400, best_val_loss=0.0986, best_test_accuracy=0.9744, end_test_accuracy=0.9726
+[2026-10-31 17:31:57] reinit level 15 done: level=15, weights_remaining=0.0358, best_step=12800, best_val_loss=0.1098, best_test_accuracy=0.9705, end_test_accuracy=0.9695
+[2026-10-31 17:34:58] random_mask level 01 done: level=1, weights_remaining=0.8004, best_step=5800, best_val_loss=0.0737, best_test_accuracy=0.9808, end_test_accuracy=0.9828
+[2026-10-31 17:37:58] random_mask level 02 done: level=2, weights_remaining=0.6406, best_step=3500, best_val_loss=0.0738, best_test_accuracy=0.9793, end_test_accuracy=0.9809
+[2026-10-31 17:40:58] random_mask level 03 done: level=3, weights_remaining=0.5128, best_step=3800, best_val_loss=0.0756, best_test_accuracy=0.9790, end_test_accuracy=0.9804
+[2026-10-31 17:43:59] random_mask level 04 done: level=4, weights_remaining=0.4105, best_step=5900, best_val_loss=0.0811, best_test_accuracy=0.9789, end_test_accuracy=0.9726
+[2026-10-31 17:46:59] random_mask level 05 done: level=5, weights_remaining=0.3287, best_step=5300, best_val_loss=0.0835, best_test_accuracy=0.9786, end_test_accuracy=0.9813
+[2026-10-31 17:49:59] random_mask level 06 done: level=6, weights_remaining=0.2632, best_step=7900, best_val_loss=0.0768, best_test_accuracy=0.9763, end_test_accuracy=0.9816
+[2026-10-31 17:52:58] random_mask level 07 done: level=7, weights_remaining=0.2107, best_step=7400, best_val_loss=0.0798, best_test_accuracy=0.9783, end_test_accuracy=0.9751
+[2026-10-31 17:55:58] random_mask level 08 done: level=8, weights_remaining=0.1688, best_step=7200, best_val_loss=0.0911, best_test_accuracy=0.9746, end_test_accuracy=0.9795
+[2026-10-31 17:58:58] random_mask level 09 done: level=9, weights_remaining=0.1352, best_step=11100, best_val_loss=0.0906, best_test_accuracy=0.9760, end_test_accuracy=0.9771
+[2026-10-31 18:01:57] random_mask level 10 done: level=10, weights_remaining=0.1083, best_step=8200, best_val_loss=0.0957, best_test_accuracy=0.9731, end_test_accuracy=0.9742
+[2026-10-31 18:04:57] random_mask level 11 done: level=11, weights_remaining=0.0868, best_step=13100, best_val_loss=0.1056, best_test_accuracy=0.9715, end_test_accuracy=0.9681
+[2026-10-31 18:07:57] random_mask level 12 done: level=12, weights_remaining=0.0695, best_step=15200, best_val_loss=0.1124, best_test_accuracy=0.9723, end_test_accuracy=0.9720
+[2026-10-31 18:10:57] random_mask level 13 done: level=13, weights_remaining=0.0557, best_step=13600, best_val_loss=0.1210, best_test_accuracy=0.9672, end_test_accuracy=0.9687
+[2026-10-31 18:13:56] random_mask level 14 done: level=14, weights_remaining=0.0447, best_step=19100, best_val_loss=0.1199, best_test_accuracy=0.9680, end_test_accuracy=0.9670
+[2026-10-31 18:16:55] random_mask level 15 done: level=15, weights_remaining=0.0358, best_step=16500, best_val_loss=0.1489, best_test_accuracy=0.9573, end_test_accuracy=0.9550
+[2026-10-31 18:19:56] random_both level 01 done: level=1, weights_remaining=0.8004, best_step=2500, best_val_loss=0.0734, best_test_accuracy=0.9779, end_test_accuracy=0.9835
+[2026-10-31 18:22:57] random_both level 02 done: level=2, weights_remaining=0.6406, best_step=4200, best_val_loss=0.0765, best_test_accuracy=0.9777, end_test_accuracy=0.9819
+[2026-10-31 18:25:57] random_both level 03 done: level=3, weights_remaining=0.5128, best_step=3800, best_val_loss=0.0770, best_test_accuracy=0.9796, end_test_accuracy=0.9809
+[2026-10-31 18:28:57] random_both level 04 done: level=4, weights_remaining=0.4105, best_step=5000, best_val_loss=0.0788, best_test_accuracy=0.9791, end_test_accuracy=0.9804
+[2026-10-31 18:31:58] random_both level 05 done: level=5, weights_remaining=0.3287, best_step=8500, best_val_loss=0.0823, best_test_accuracy=0.9787, end_test_accuracy=0.9796
+[2026-10-31 18:34:59] random_both level 06 done: level=6, weights_remaining=0.2632, best_step=6500, best_val_loss=0.0790, best_test_accuracy=0.9781, end_test_accuracy=0.9804
+[2026-10-31 18:37:59] random_both level 07 done: level=7, weights_remaining=0.2107, best_step=6500, best_val_loss=0.0868, best_test_accuracy=0.9780, end_test_accuracy=0.9803
+[2026-10-31 18:40:58] random_both level 08 done: level=8, weights_remaining=0.1688, best_step=5800, best_val_loss=0.0902, best_test_accuracy=0.9756, end_test_accuracy=0.9779
+[2026-10-31 18:43:59] random_both level 09 done: level=9, weights_remaining=0.1352, best_step=9400, best_val_loss=0.0970, best_test_accuracy=0.9739, end_test_accuracy=0.9772
+[2026-10-31 18:46:59] random_both level 10 done: level=10, weights_remaining=0.1083, best_step=10400, best_val_loss=0.0959, best_test_accuracy=0.9751, end_test_accuracy=0.9757
+[2026-10-31 18:49:58] random_both level 11 done: level=11, weights_remaining=0.0868, best_step=13100, best_val_loss=0.1027, best_test_accuracy=0.9714, end_test_accuracy=0.9715
+[2026-10-31 18:52:57] random_both level 12 done: level=12, weights_remaining=0.0695, best_step=15700, best_val_loss=0.1098, best_test_accuracy=0.9699, end_test_accuracy=0.9684
+[2026-10-31 18:55:57] random_both level 13 done: level=13, weights_remaining=0.0557, best_step=18700, best_val_loss=0.1062, best_test_accuracy=0.9682, end_test_accuracy=0.9656
+[2026-10-31 18:58:56] random_both level 14 done: level=14, weights_remaining=0.0447, best_step=21600, best_val_loss=0.1238, best_test_accuracy=0.9642, end_test_accuracy=0.9627
+[2026-10-31 19:01:55] random_both level 15 done: level=15, weights_remaining=0.0358, best_step=20500, best_val_loss=0.1444, best_test_accuracy=0.9609, end_test_accuracy=0.9607
+[2026-10-31 19:01:55] All requested controls complete.

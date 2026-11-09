@@ -1,0 +1,2 @@
+level,weights_remaining,best_step,best_val_loss,best_test_accuracy,end_test_accuracy
+1,0.8003756574004508,4400,0.07282377166748047,0.9792,0.9827

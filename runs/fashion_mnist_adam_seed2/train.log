@@ -1,0 +1,17 @@
+[2026-11-02 03:16:50] Starting new run in runs\fashion_mnist_adam_seed2 on cuda: {"dataset": "fashion_mnist", "model": "lenet300100", "seed": 2, "split_seed": 0, "rounds": 15, "steps": 50000, "batch_size": 60, "eval_every": 100, "lr": 0.0012, "optimizer": "adam", "pruning": "layerwise", "global_rate": 0.2, "device": "auto", "no_progress": false, "out": "runs/fashion_mnist_adam_seed2"}
+[2026-11-02 03:19:47] level 00 done: level=0, weights_remaining=1.0000, best_step=6800, best_val_loss=0.2979, best_test_accuracy=0.8846, end_test_accuracy=0.8964
+[2026-11-02 03:22:48] level 01 done: level=1, weights_remaining=0.8004, best_step=6900, best_val_loss=0.2897, best_test_accuracy=0.8899, end_test_accuracy=0.8960
+[2026-11-02 03:25:50] level 02 done: level=2, weights_remaining=0.6406, best_step=7200, best_val_loss=0.2867, best_test_accuracy=0.8898, end_test_accuracy=0.8914
+[2026-11-02 03:28:53] level 03 done: level=3, weights_remaining=0.5128, best_step=7500, best_val_loss=0.2929, best_test_accuracy=0.8878, end_test_accuracy=0.8907
+[2026-11-02 03:31:55] level 04 done: level=4, weights_remaining=0.4105, best_step=7900, best_val_loss=0.2851, best_test_accuracy=0.8892, end_test_accuracy=0.8921
+[2026-11-02 03:34:56] level 05 done: level=5, weights_remaining=0.3287, best_step=7400, best_val_loss=0.2878, best_test_accuracy=0.8928, end_test_accuracy=0.8893
+[2026-11-02 03:37:57] level 06 done: level=6, weights_remaining=0.2632, best_step=5300, best_val_loss=0.2893, best_test_accuracy=0.8881, end_test_accuracy=0.8925
+[2026-11-02 03:40:59] level 07 done: level=7, weights_remaining=0.2107, best_step=5400, best_val_loss=0.2863, best_test_accuracy=0.8912, end_test_accuracy=0.8912
+[2026-11-02 03:44:00] level 08 done: level=8, weights_remaining=0.1688, best_step=5800, best_val_loss=0.2838, best_test_accuracy=0.8918, end_test_accuracy=0.8878
+[2026-11-02 03:47:00] level 09 done: level=9, weights_remaining=0.1352, best_step=7000, best_val_loss=0.2895, best_test_accuracy=0.8910, end_test_accuracy=0.8881
+[2026-11-02 03:50:03] level 10 done: level=10, weights_remaining=0.1083, best_step=5000, best_val_loss=0.2920, best_test_accuracy=0.8905, end_test_accuracy=0.8878
+[2026-11-02 03:53:05] level 11 done: level=11, weights_remaining=0.0868, best_step=7200, best_val_loss=0.2963, best_test_accuracy=0.8893, end_test_accuracy=0.8836
+[2026-11-02 03:56:06] level 12 done: level=12, weights_remaining=0.0695, best_step=7500, best_val_loss=0.2954, best_test_accuracy=0.8923, end_test_accuracy=0.8854
+[2026-11-02 03:59:05] level 13 done: level=13, weights_remaining=0.0557, best_step=6600, best_val_loss=0.2911, best_test_accuracy=0.8879, end_test_accuracy=0.8818
+[2026-11-02 04:02:06] level 14 done: level=14, weights_remaining=0.0447, best_step=8800, best_val_loss=0.2990, best_test_accuracy=0.8888, end_test_accuracy=0.8793
+[2026-11-02 04:05:09] level 15 done: level=15, weights_remaining=0.0358, best_step=10100, best_val_loss=0.3055, best_test_accuracy=0.8864, end_test_accuracy=0.8851
