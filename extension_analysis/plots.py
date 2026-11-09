@@ -1,4 +1,4 @@
-"""Plotting routines for mask stability analysis."""
+"""Plotting routines for mask stability and random reference analysis."""
 
 from pathlib import Path
 from typing import Optional
@@ -12,6 +12,8 @@ import pandas as pd
 INK = "#0b0b0b"
 MUTED = "#52514e"
 GRID = "#e4e3df"
+ACCENT_BLUE = "#2a78d6"
+ACCENT_ORANGE = "#eb6834"
 
 PAIR_COLORS = {
     (1, 2): "#7da0fa",
@@ -37,21 +39,8 @@ DATASET_TITLES = {
 }
 
 
-def plot_mask_stability_grid(
-    df_summary: pd.DataFrame,
-    df_pairs: pd.DataFrame,
-    save_png: Optional[Path] = None,
-    save_pdf: Optional[Path] = None,
-    dpi: int = 200,
-) -> plt.Figure:
-    """Generate 2x4 grid plot of Jaccard similarity vs weights remaining.
-
-    Row 0: MNIST
-    Row 1: Fashion-MNIST
-    Col 0: Overall, Col 1: FC1, Col 2: FC2, Col 3: FC3
-    Excludes Level 0 (dense, Jaccard=1.0) from the main sparse stability curves.
-    """
-    rc_params = {
+def _get_base_rc_params() -> dict:
+    return {
         "figure.dpi": 110,
         "font.size": 9.5,
         "axes.titlesize": 10.5,
@@ -69,6 +58,22 @@ def plot_mask_stability_grid(
         "legend.fontsize": 8.5,
     }
 
+
+def plot_mask_stability_grid(
+    df_summary: pd.DataFrame,
+    df_pairs: pd.DataFrame,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 200,
+) -> plt.Figure:
+    """Generate 2x4 grid plot of Jaccard similarity vs weights remaining.
+
+    Row 0: MNIST
+    Row 1: Fashion-MNIST
+    Col 0: Overall, Col 1: FC1, Col 2: FC2, Col 3: FC3
+    Excludes Level 0 (dense, Jaccard=1.0) from the main sparse stability curves.
+    """
+    rc_params = _get_base_rc_params()
     datasets = ["mnist", "fashion_mnist"]
     scopes = ["overall", "fc1.weight", "fc2.weight", "fc3.weight"]
 
@@ -175,7 +180,6 @@ def plot_mask_stability_grid(
                     ),
                 )
 
-        # Single legend for the entire figure at top
         fig.legend(
             loc="upper center",
             bbox_to_anchor=(0.5, 1.02),
@@ -194,3 +198,191 @@ def plot_mask_stability_grid(
 
     return fig
 
+
+def plot_random_reference_grid(
+    df_summary: pd.DataFrame,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 200,
+) -> plt.Figure:
+    """Generate 2x4 grid plot comparing observed Jaccard vs. density-matched random reference.
+
+    Row 0: MNIST, Row 1: Fashion-MNIST.
+    Col 0: Overall, Col 1: FC1, Col 2: FC2, Col 3: FC3.
+    Level 0 is excluded from sparse curves.
+    """
+    rc_params = _get_base_rc_params()
+    datasets = ["mnist", "fashion_mnist"]
+    scopes = ["overall", "fc1.weight", "fc2.weight", "fc3.weight"]
+
+    # Filter out Level 0
+    sub_df = df_summary[df_summary["level"] > 0].copy()
+
+    with plt.rc_context(rc_params):
+        fig, axes = plt.subplots(
+            nrows=2,
+            ncols=4,
+            figsize=(14, 6.8),
+            sharey=True,
+            sharex=False,
+        )
+
+        for row_idx, ds in enumerate(datasets):
+            ds_name = DATASET_TITLES.get(ds, ds)
+            for col_idx, scp in enumerate(scopes):
+                ax = axes[row_idx, col_idx]
+
+                grp = sub_df[(sub_df["dataset"] == ds) & (sub_df["scope"] == scp)]
+                grp_sorted = grp.sort_values(by="weights_remaining", ascending=False)
+                x_vals = grp_sorted["weights_remaining"] * 100
+
+                # 1. 95% Reference Interval (Pointwise Monte Carlo reference interval)
+                ax.fill_between(
+                    x_vals,
+                    grp_sorted["reference_p025"],
+                    grp_sorted["reference_p975"],
+                    color=ACCENT_BLUE,
+                    alpha=0.25,
+                    label="Random 95% reference interval" if (row_idx == 0 and col_idx == 0) else None,
+                    linewidth=0,
+                )
+
+                # 2. Random reference mean (dashed curve)
+                ax.plot(
+                    x_vals,
+                    grp_sorted["reference_mean"],
+                    color=ACCENT_BLUE,
+                    linestyle="--",
+                    linewidth=1.8,
+                    label="Random reference mean" if (row_idx == 0 and col_idx == 0) else None,
+                    zorder=3,
+                )
+
+                # 3. Observed IMP mean (solid black curve)
+                ax.plot(
+                    x_vals,
+                    grp_sorted["observed_mean"],
+                    color=INK,
+                    linestyle="-",
+                    linewidth=2.0,
+                    marker="o",
+                    markersize=4.0,
+                    label="Observed ticket mean" if (row_idx == 0 and col_idx == 0) else None,
+                    zorder=4,
+                )
+
+                # Axis configuration
+                ax.set_xscale("log")
+                ax.invert_xaxis()
+                ax.set_ylim(-0.02, 1.02)
+
+                ticks = [100, 50, 20, 10, 5]
+                ax.set_xticks(ticks)
+                ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
+                ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%g%%"))
+
+                if row_idx == 0:
+                    ax.set_title(SCOPE_TITLES.get(scp, scp), pad=8, weight="bold")
+                if col_idx == 0:
+                    ax.set_ylabel(f"{ds_name}\nJaccard Similarity", color=INK)
+                if row_idx == 1:
+                    ax.set_xlabel("Weights remaining (log scale)")
+
+                # Annotation of coverage
+                n_pairs = int(grp_sorted["n_pairs"].iloc[0]) if not grp_sorted.empty else 0
+                n_reps = int(grp_sorted["n_replicates"].iloc[0]) if not grp_sorted.empty else 0
+                ax.text(
+                    0.05,
+                    0.05,
+                    f"Pairs: {n_pairs} | R: {n_reps}",
+                    transform=ax.transAxes,
+                    fontsize=7.5,
+                    color=MUTED,
+                    bbox=dict(
+                        boxstyle="round,pad=0.2",
+                        facecolor="white",
+                        edgecolor=GRID,
+                        alpha=0.8,
+                    ),
+                )
+
+        fig.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.02),
+            ncol=3,
+            frameon=False,
+            fontsize=9,
+        )
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+        if save_png:
+            Path(save_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
+
+
+def plot_random_reference_difference(
+    df_summary: pd.DataFrame,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 200,
+) -> plt.Figure:
+    """Generate concise 1x2 plot of (Observed - Reference) overall Jaccard difference.
+
+    Panel 0: MNIST, Panel 1: Fashion-MNIST.
+    """
+    rc_params = _get_base_rc_params()
+    datasets = ["mnist", "fashion_mnist"]
+    sub_df = df_summary[(df_summary["level"] > 0) & (df_summary["scope"] == "overall")].copy()
+
+    with plt.rc_context(rc_params):
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4.0), sharey=True)
+
+        for idx, ds in enumerate(datasets):
+            ax = axes[idx]
+            ds_name = DATASET_TITLES.get(ds, ds)
+            grp = sub_df[sub_df["dataset"] == ds].sort_values(by="weights_remaining", ascending=False)
+            x_vals = grp["weights_remaining"] * 100
+            diff_vals = grp["observed_minus_reference"]
+
+            # Zero reference line
+            ax.axhline(0, color=MUTED, linestyle="--", linewidth=1.0, alpha=0.7)
+
+            ax.plot(
+                x_vals,
+                diff_vals,
+                color=INK if ds == "mnist" else ACCENT_ORANGE,
+                linewidth=2.0,
+                marker="o",
+                markersize=4.5,
+                label=f"{ds_name} overall difference",
+            )
+
+            ax.set_xscale("log")
+            ax.invert_xaxis()
+            ticks = [100, 50, 20, 10, 5]
+            ax.set_xticks(ticks)
+            ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
+            ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%g%%"))
+
+            ax.set_title(f"{ds_name} — Excess Overlap", pad=8, weight="bold")
+            ax.set_xlabel("Weights remaining (log scale)")
+            if idx == 0:
+                ax.set_ylabel("Observed − Reference Jaccard", color=INK)
+
+            ax.legend(loc="upper right", frameon=False)
+
+        plt.tight_layout()
+
+        if save_png:
+            Path(save_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
