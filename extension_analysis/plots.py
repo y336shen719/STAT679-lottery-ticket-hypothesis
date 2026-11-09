@@ -646,3 +646,229 @@ def plot_structure_function_scatter(
             fig.savefig(save_pdf, bbox_inches="tight")
 
     return fig
+
+
+LAYER_COLORS = {
+    "fc1.weight": "#2a78d6",
+    "fc2.weight": "#eb6834",
+    "fc3.weight": "#2ba84a",
+    "overall": "#111111",
+}
+
+LAYER_DISPLAY_NAMES = {
+    "fc1.weight": "FC1 (300 × 784, 20%/lvl)",
+    "fc2.weight": "FC2 (100 × 300, 20%/lvl)",
+    "fc3.weight": "FC3 (10 × 100, 10%/lvl)",
+    "overall": "Overall Network",
+}
+
+
+def plot_layer_sparsity_curves(
+    df_summary: pd.DataFrame,
+    out_path: Optional[Path] = None,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 300,
+) -> plt.Figure:
+    """Plot layerwise sparsity and surviving weights across pruning levels."""
+    target_png = save_png or out_path
+    df_plot = df_summary[df_summary["dataset"] == "mnist"].copy() if "dataset" in df_summary.columns else df_summary.copy()
+
+    with plt.rc_context(_get_base_rc_params()):
+        fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.5), dpi=dpi)
+
+        ax1 = axes[0]
+        for layer_name in ["fc1.weight", "fc2.weight", "fc3.weight", "overall"]:
+            sub = df_plot[df_plot["layer"] == layer_name].sort_values("level")
+            ax1.plot(
+                sub["level"],
+                sub["sparsity_mean"] * 100.0,
+                marker="o",
+                markersize=4.5,
+                linewidth=1.8,
+                label=LAYER_DISPLAY_NAMES[layer_name],
+                color=LAYER_COLORS[layer_name],
+            )
+
+        ax1.set_title("Layer Sparsity across Pruning Levels", pad=8, weight="bold")
+        ax1.set_xlabel("Pruning Level")
+        ax1.set_ylabel("Sparsity (% pruned)")
+        ax1.set_ylim(-2.0, 102.0)
+        ax1.set_xticks(range(0, 16, 2))
+        ax1.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=100))
+        ax1.legend(loc="lower right", fontsize=8.0)
+
+        ax2 = axes[1]
+        for layer_name in ["fc1.weight", "fc2.weight", "fc3.weight", "overall"]:
+            sub = df_plot[df_plot["layer"] == layer_name].sort_values("level")
+            ax2.plot(
+                sub["level"],
+                sub["surviving_mean"],
+                marker="s",
+                markersize=4.5,
+                linewidth=1.8,
+                label=LAYER_DISPLAY_NAMES[layer_name],
+                color=LAYER_COLORS[layer_name],
+            )
+
+        ax2.set_title("Surviving Connection Count (Log Scale)", pad=8, weight="bold")
+        ax2.set_xlabel("Pruning Level")
+        ax2.set_ylabel("Surviving Connections (Log Scale)")
+        ax2.set_yscale("log")
+        ax2.set_xticks(range(0, 16, 2))
+        ax2.yaxis.set_major_formatter(ticker.ScalarFormatter())
+        ax2.legend(loc="upper right", fontsize=8.0)
+
+        plt.tight_layout()
+
+        if target_png:
+            Path(target_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(target_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
+
+
+def plot_layer_share_evolution(
+    df_summary: pd.DataFrame,
+    out_path: Optional[Path] = None,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 300,
+) -> plt.Figure:
+    """Plot the evolution of each layer's share of total remaining network parameters."""
+    target_png = save_png or out_path
+    df_plot = df_summary[df_summary["dataset"] == "mnist"].copy() if "dataset" in df_summary.columns else df_summary.copy()
+
+    with plt.rc_context(_get_base_rc_params()):
+        fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.5), dpi=dpi)
+
+        ax1 = axes[0]
+        for layer_name in ["fc1.weight", "fc2.weight"]:
+            sub = df_plot[df_plot["layer"] == layer_name].sort_values("level")
+            ax1.plot(
+                sub["level"],
+                sub["surviving_share_mean"] * 100.0,
+                marker="o",
+                markersize=4.5,
+                linewidth=1.8,
+                label=LAYER_DISPLAY_NAMES[layer_name],
+                color=LAYER_COLORS[layer_name],
+            )
+
+        ax1.set_title("Surviving Parameter Share: FC1 & FC2", pad=8, weight="bold")
+        ax1.set_xlabel("Pruning Level")
+        ax1.set_ylabel("Share of Remaining Weights (%)")
+        ax1.set_xticks(range(0, 16, 2))
+        ax1.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=100))
+        ax1.legend(loc="center right", fontsize=8.0)
+
+        ax2 = axes[1]
+        sub_fc3 = df_plot[df_plot["layer"] == "fc3.weight"].sort_values("level")
+        ax2.plot(
+            sub_fc3["level"],
+            sub_fc3["surviving_share_mean"] * 100.0,
+            marker="^",
+            markersize=5.0,
+            linewidth=2.0,
+            label="FC3 (10%/lvl rate vs 20%/lvl for FC1/FC2)",
+            color=LAYER_COLORS["fc3.weight"],
+        )
+
+        ax2.set_title("Surviving Parameter Share: FC3 (Relative Expansion)", pad=8, weight="bold")
+        ax2.set_xlabel("Pruning Level")
+        ax2.set_ylabel("Share of Remaining Weights (%)")
+        ax2.set_xticks(range(0, 16, 2))
+        ax2.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=100))
+
+        ax2.annotate(
+            "Share expands 5.7×:\n0.38% (L0) → 2.16% (L15)",
+            xy=(15, 2.16),
+            xytext=(9, 1.4),
+            arrowprops=dict(arrowstyle="->", color=MUTED, lw=1.0),
+            fontsize=8.5,
+            color=INK,
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="#fbfbf9", edgecolor=GRID),
+        )
+
+        ax2.legend(loc="upper left", fontsize=8.0)
+
+        plt.tight_layout()
+
+        if target_png:
+            Path(target_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(target_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig
+
+
+def plot_pruning_schedule_adherence(
+    df_summary: pd.DataFrame,
+    out_path: Optional[Path] = None,
+    save_png: Optional[Path] = None,
+    save_pdf: Optional[Path] = None,
+    dpi: int = 300,
+) -> plt.Figure:
+    """Plot actual per-round pruning rate vs scheduled rate and rounding discrepancy."""
+    target_png = save_png or out_path
+    df_plot = df_summary[df_summary["dataset"] == "mnist"].copy() if "dataset" in df_summary.columns else df_summary.copy()
+    sparse_data = df_plot[df_plot["level"] > 0].copy()
+
+    with plt.rc_context(_get_base_rc_params()):
+        fig, axes = plt.subplots(2, 1, figsize=(9.5, 6.0), dpi=dpi, sharex=True)
+
+        ax1 = axes[0]
+        for layer_name in ["fc1.weight", "fc2.weight", "fc3.weight", "overall"]:
+            sub = sparse_data[sparse_data["layer"] == layer_name].sort_values("level")
+            ax1.plot(
+                sub["level"],
+                sub["actual_prune_rate_mean"] * 100.0,
+                marker="o",
+                markersize=4.0,
+                linewidth=1.5,
+                label=LAYER_DISPLAY_NAMES[layer_name],
+                color=LAYER_COLORS[layer_name],
+            )
+
+        ax1.set_title("Per-Round Actual Pruning Rate vs Pruning Schedule", pad=8, weight="bold")
+        ax1.set_ylabel("Actual Prune Rate (%)")
+        ax1.set_ylim(8.0, 22.0)
+        ax1.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=100))
+        ax1.legend(loc="center right", fontsize=8.0)
+
+        ax2 = axes[1]
+        for layer_name in ["fc1.weight", "fc2.weight", "fc3.weight", "overall"]:
+            sub = sparse_data[sparse_data["layer"] == layer_name].sort_values("level")
+            ax2.plot(
+                sub["level"],
+                sub["prune_rate_diff_mean"] * 100.0,
+                marker="s",
+                markersize=4.0,
+                linewidth=1.2,
+                label=LAYER_DISPLAY_NAMES[layer_name],
+                color=LAYER_COLORS[layer_name],
+            )
+
+        ax2.axhline(0.0, color=MUTED, linestyle="--", linewidth=0.8)
+        ax2.set_title("Rounding Discrepancy: (Actual - Scheduled Rate) from integer round()", pad=8, weight="bold")
+        ax2.set_xlabel("Pruning Level")
+        ax2.set_ylabel("Discrepancy (percentage points)")
+        ax2.set_xticks(range(1, 16))
+        ax2.set_ylim(-0.20, 0.20)
+        ax2.legend(loc="lower left", fontsize=8.0)
+
+        plt.tight_layout()
+
+        if target_png:
+            Path(target_png).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(target_png, dpi=dpi, bbox_inches="tight")
+        if save_pdf:
+            Path(save_pdf).parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(save_pdf, bbox_inches="tight")
+
+    return fig

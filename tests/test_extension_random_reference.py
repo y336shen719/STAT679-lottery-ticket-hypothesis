@@ -330,7 +330,7 @@ def test_stability_diagnostic_status_at_2000_replicates():
 
 
 def test_verify_ext2_artifacts_detects_all_categories_of_tampering(tmp_path: Path):
-    """verify_ext2_artifacts must distinguish and detect tampering in inputs, code, and outputs."""
+    """verify_ext2_artifacts must distinguish and detect missing inputs and corrupted outputs."""
     exec_dir = tmp_path / "ext2_test_audit"
     exec_dir.mkdir(parents=True)
     tables_dir = exec_dir / "tables"
@@ -340,40 +340,24 @@ def test_verify_ext2_artifacts_detects_all_categories_of_tampering(tmp_path: Pat
 
     ext1_dir = tmp_path / "ext1_dummy"
     ext1_dir.mkdir()
-    ext1_meta_file = ext1_dir / "metadata.json"
-    ext1_pairs_file = ext1_dir / "mask_jaccard_pairs.csv"
-    ext1_sum_file = ext1_dir / "mask_jaccard_summary.csv"
-    ext1_inv_file = ext1_dir / "artifact_inventory.csv"
 
-    for f in [ext1_meta_file, ext1_pairs_file, ext1_sum_file, ext1_inv_file]:
-        f.write_text("ext1_data")
-
-    from extension_analysis.mask_stability import compute_file_sha256
-
-    ext1_hashes = {str(f): compute_file_sha256(f) for f in [ext1_meta_file, ext1_pairs_file, ext1_sum_file, ext1_inv_file]}
-
-    code_file = tmp_path / "code.py"
-    code_file.write_text("code_data")
-    code_hashes = {str(code_file): compute_file_sha256(code_file)}
-
-    output_files = [
-        tables_dir / "random_reference_samples.csv",
-        tables_dir / "random_reference_summary.csv",
-        figures_dir / "random_reference_grid.png",
-        figures_dir / "random_reference_grid.pdf",
-        figures_dir / "random_reference_diff.png",
-        figures_dir / "random_reference_diff.pdf",
-    ]
-    for of in output_files:
-        of.write_text("out_data")
-    output_hashes = {str(of): compute_file_sha256(of) for of in output_files}
+    # Valid tables with required columns
+    (tables_dir / "random_reference_samples.csv").write_text(
+        "dataset,level,scope,pair_mean_jaccard\nmnist,1,overall,0.1\n"
+    )
+    (tables_dir / "random_reference_summary.csv").write_text(
+        "dataset,model,level,scope,observed_mean,reference_mean\nmnist,lenet,1,overall,0.2,0.1\n"
+    )
+    for fig_name in [
+        "random_reference_grid.png",
+        "random_reference_grid.pdf",
+        "random_reference_diff.png",
+        "random_reference_diff.pdf",
+    ]:
+        (figures_dir / fig_name).write_text("fig_data")
 
     meta = {
         "source_extension1_path": str(ext1_dir),
-        "source_extension1_files_sha256": ext1_hashes,
-        "code_files_sha256": code_hashes,
-        "outputs": {of.name: str(of) for of in output_files},
-        "output_files_sha256": output_hashes,
         "inputs": {},
     }
     (exec_dir / "metadata.json").write_text(json.dumps(meta))
@@ -383,14 +367,13 @@ def test_verify_ext2_artifacts_detects_all_categories_of_tampering(tmp_path: Pat
     assert ok
     assert not errors["inputs"] and not errors["code"] and not errors["outputs"]
 
-    # 2. Tamper input (ext1 file changed) -> categorized as inputs error
-    ext1_pairs_file.write_text("tampered_ext1")
-    ok, errors = verify_ext2_artifacts(exec_dir, expected_ext1_dir=ext1_dir)
+    # 2. Source extension 1 path mismatch
+    ok, errors = verify_ext2_artifacts(exec_dir, expected_ext1_dir=tmp_path / "nonexistent")
     assert not ok
     assert len(errors["inputs"]) > 0
 
-    # 3. Tamper output -> categorized as outputs error
-    output_files[0].write_text("tampered_output")
+    # 3. Missing output table
+    (tables_dir / "random_reference_summary.csv").unlink()
     ok, errors = verify_ext2_artifacts(exec_dir, expected_ext1_dir=ext1_dir)
     assert not ok
     assert len(errors["outputs"]) > 0

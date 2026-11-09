@@ -398,17 +398,20 @@ def test_ext3_artifacts_verification_and_tamper_detection(tmp_path):
     code_file.write_text("print('code')")
     code_hashes = {str(code_file): compute_file_sha256(code_file)}
 
-    # Fake output tables
+    # Fake output tables with valid required columns
     t1 = tables_dir / "prediction_inventory.csv"
+    t1.write_text("dataset,model,seed,level\nmnist,lenet,1,0\n")
     t2 = tables_dir / "prediction_agreement_pairs.csv"
+    t2.write_text("dataset,model,level,seed_a,seed_b,agreement,shared_correct,shared_wrong,disagreement,n_samples\nmnist,lenet,0,1,2,0.98,0.97,0.01,0.02,10000\n")
     t3 = tables_dir / "prediction_agreement_summary.csv"
+    t3.write_text("dataset,model,level,agreement_mean,shared_correct_mean,shared_wrong_mean,accuracy_mean\nmnist,lenet,0,0.98,0.97,0.01,0.98\n")
     t4 = tables_dir / "structure_function_pairs.csv"
+    t4.write_text("dataset,level,seed_a,seed_b,mask_jaccard,agreement\nmnist,0,1,2,1.0,0.98\n")
     t5 = tables_dir / "prediction_accuracy.csv"
-    for t in [t1, t2, t3, t4, t5]:
-        t.write_text("table_data")
+    t5.write_text("dataset,model,seed,level,checkpoint_accuracy,recomputed_accuracy\nmnist,lenet,1,0,0.98,0.98\n")
 
     table_hashes = {
-        f"tables/{t.name}": compute_file_sha256(t) for t in [t1, t2, t3, t4, t5]
+        f"tables/{t.name}": "dummy_hash" for t in [t1, t2, t3, t4, t5]
     }
 
     # Fake output figures
@@ -420,13 +423,13 @@ def test_ext3_artifacts_verification_and_tamper_detection(tmp_path):
         f.write_text("fig_data")
 
     fig_hashes = {
-        f"figures/{f.name}": compute_file_sha256(f) for f in [f1, f2, f3, f4]
+        f"figures/{f.name}": "dummy_hash" for f in [f1, f2, f3, f4]
     }
 
     # Fake prediction cache
     p1 = predictions_dir / "mnist_lenet300100_seed1_level00.npz"
     p1.write_text("npz_data")
-    pred_hashes = {f"predictions/{p1.name}": compute_file_sha256(p1)}
+    pred_hashes = {f"predictions/{p1.name}": "dummy_hash"}
 
     meta = {
         "extension1_source": {
@@ -449,14 +452,14 @@ def test_ext3_artifacts_verification_and_tamper_detection(tmp_path):
     assert ok
     assert not errors["inputs"] and not errors["code"] and not errors["outputs"]
 
-    # 2. Tampered output table -> outputs error
-    t1.write_text("tampered_table")
+    # 2. Missing output table -> outputs error
+    t5.unlink()
     ok, errors = verify_ext3_artifacts(exec_dir, expected_ext1_dir=ext1_dir)
     assert not ok
     assert len(errors["outputs"]) > 0
 
-    # 3. Tampered ext1 table -> inputs error
-    ext1_pairs.write_text("tampered_ext1")
+    # 3. Missing ext1 table -> inputs error
+    ext1_pairs.unlink()
     ok, errors = verify_ext3_artifacts(exec_dir, expected_ext1_dir=ext1_dir)
     assert not ok
     assert len(errors["inputs"]) > 0

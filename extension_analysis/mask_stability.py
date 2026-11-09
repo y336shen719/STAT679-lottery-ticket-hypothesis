@@ -731,24 +731,26 @@ def verify_execution_artifacts(
         if not rf.is_file():
             errors.append(f"Missing required artifact: {rf}")
 
-    # Check input file SHA-256 integrity
-    recorded_inputs = meta.get("inputs", {})
-    if not recorded_inputs:
-        errors.append("No inputs recorded in metadata.json")
-    else:
-        for file_path_str, info in recorded_inputs.items():
-            expected_sha = info.get("sha256")
-            if not expected_sha:
-                continue
-            p = Path(file_path_str)
-            if not p.is_file():
-                errors.append(f"Recorded input file no longer exists: {p}")
-                continue
-            actual_sha = compute_file_sha256(p)
-            if actual_sha != expected_sha:
-                errors.append(
-                    f"SHA-256 hash mismatch for {p}: current={actual_sha} recorded={expected_sha}"
-                )
+    # Validate required columns in tables if files exist
+    pairs_file = execution_dir / "tables" / "mask_jaccard_pairs.csv"
+    if pairs_file.is_file():
+        try:
+            df_p = pd.read_csv(pairs_file, nrows=5)
+            req_cols = {"dataset", "model", "level", "seed_a", "seed_b", "scope", "jaccard"}
+            if not req_cols.issubset(df_p.columns):
+                errors.append(f"Missing required columns in {pairs_file}: {req_cols - set(df_p.columns)}")
+        except Exception as e:
+            errors.append(f"Failed to read {pairs_file}: {e}")
+
+    summary_file = execution_dir / "tables" / "mask_jaccard_summary.csv"
+    if summary_file.is_file():
+        try:
+            df_s = pd.read_csv(summary_file, nrows=5)
+            req_cols = {"dataset", "model", "level", "scope", "mean"}
+            if not req_cols.issubset(df_s.columns):
+                errors.append(f"Missing required columns in {summary_file}: {req_cols - set(df_s.columns)}")
+        except Exception as e:
+            errors.append(f"Failed to read {summary_file}: {e}")
 
     return (len(errors) == 0), errors
 

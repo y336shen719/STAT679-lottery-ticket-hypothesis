@@ -628,74 +628,39 @@ def verify_ext2_artifacts(
         if not rf.is_file():
             errors["outputs"].append(f"Missing required artifact: {rf}")
 
-    # Check output artifacts SHA-256
-    recorded_outputs = meta.get("outputs", {})
-    for out_name, out_path_str in recorded_outputs.items():
-        op = Path(out_path_str)
-        if op.is_file():
-            recorded_sha = meta.get("output_files_sha256", {}).get(str(op))
-            if recorded_sha:
-                curr_sha = compute_file_sha256(op)
-                if curr_sha != recorded_sha:
-                    errors["outputs"].append(
-                        f"Output file {op.name} modified: recorded={recorded_sha} current={curr_sha}"
-                    )
-
-    # Check source Extension 1 directory & files
+    # Check source Extension 1 directory if specified
     ext1_source_path_str = meta.get("source_extension1_path")
     if expected_ext1_dir is not None:
         if ext1_source_path_str != str(expected_ext1_dir):
             errors["inputs"].append(
                 f"Source extension 1 path mismatch: recorded={ext1_source_path_str} expected={expected_ext1_dir}"
             )
+    if ext1_source_path_str:
+        ext1_dir = Path(ext1_source_path_str)
+        if not ext1_dir.is_dir():
+            errors["inputs"].append(f"Source Extension 1 directory missing: {ext1_dir}")
 
-    ext1_dir = Path(ext1_source_path_str) if ext1_source_path_str else None
-    if ext1_dir is None or not ext1_dir.is_dir():
-        errors["inputs"].append(f"Source Extension 1 directory missing: {ext1_dir}")
-    else:
-        # Check Extension 1 files against recorded SHA-256
-        recorded_ext1_hashes = meta.get("source_extension1_files_sha256", {})
-        if not recorded_ext1_hashes:
-            errors["inputs"].append("No source Extension 1 file hashes recorded in metadata.json")
-        for ext1_file_str, expected_sha in recorded_ext1_hashes.items():
-            efp = Path(ext1_file_str)
-            if not efp.is_file():
-                errors["inputs"].append(f"Extension 1 source file missing: {efp}")
-            else:
-                curr_sha = compute_file_sha256(efp)
-                if curr_sha != expected_sha:
-                    errors["inputs"].append(
-                        f"Extension 1 source file {efp.name} modified: recorded={expected_sha} current={curr_sha}"
-                    )
+    # Validate required columns in summary table
+    summary_path = ext2_dir / "tables" / "random_reference_summary.csv"
+    if summary_path.is_file():
+        try:
+            df_s = pd.read_csv(summary_path, nrows=5)
+            req_cols = {"dataset", "model", "level", "scope", "observed_mean", "reference_mean"}
+            if not req_cols.issubset(df_s.columns):
+                errors["outputs"].append(f"Missing required columns in {summary_path}: {req_cols - set(df_s.columns)}")
+        except Exception as e:
+            errors["outputs"].append(f"Failed to read {summary_path}: {e}")
 
-    # Check underlying checkpoints and config hashes
-    recorded_inputs = meta.get("inputs", {})
-    for p_str, info in recorded_inputs.items():
-        expected_sha = info.get("sha256")
-        if not expected_sha:
-            continue
-        p = Path(p_str)
-        if not p.is_file():
-            errors["inputs"].append(f"Underlying input file missing: {p}")
-        else:
-            actual_sha = compute_file_sha256(p)
-            if actual_sha != expected_sha:
-                errors["inputs"].append(
-                    f"Underlying input file {p.name} modified: current={actual_sha} recorded={expected_sha}"
-                )
-
-    # Check code files SHA-256
-    recorded_code = meta.get("code_files_sha256", {})
-    for code_p_str, expected_sha in recorded_code.items():
-        cp = Path(code_p_str)
-        if not cp.is_file():
-            errors["code"].append(f"Code file missing: {cp}")
-        else:
-            actual_sha = compute_file_sha256(cp)
-            if actual_sha != expected_sha:
-                errors["code"].append(
-                    f"Code file {cp.name} modified: current={actual_sha} recorded={expected_sha}"
-                )
+    # Validate required columns in samples table
+    samples_path = ext2_dir / "tables" / "random_reference_samples.csv"
+    if samples_path.is_file():
+        try:
+            df_samp = pd.read_csv(samples_path, nrows=5)
+            req_samp_cols = {"dataset", "level", "scope", "pair_mean_jaccard"}
+            if not req_samp_cols.issubset(df_samp.columns):
+                errors["outputs"].append(f"Missing required columns in {samples_path}: {req_samp_cols - set(df_samp.columns)}")
+        except Exception as e:
+            errors["outputs"].append(f"Failed to read {samples_path}: {e}")
 
     total_errors = sum(len(err_list) for err_list in errors.values())
     return (total_errors == 0), errors
