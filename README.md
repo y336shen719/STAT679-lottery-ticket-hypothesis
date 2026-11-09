@@ -38,8 +38,8 @@ CPU or CUDA environment.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-# Notebook and plotting dependencies are installed separately:
-pip install pandas matplotlib jupyterlab
+# Install the notebook interface separately:
+pip install jupyterlab
 ```
 
 On Windows, activate the environment with `.venv\Scripts\activate`.
